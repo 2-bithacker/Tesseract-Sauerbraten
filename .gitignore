@@ -1,0 +1,27 @@
+# Sauerbraten game data (not legally redistributable)
+packages/
+
+# Compiled binaries
+bin_unix/native_*
+bin_unix/linux_64_*
+src/tess_*
+*.exe
+*.o
+*.a
+*.lo
+*.la
+*.lai
+*.Plo
+
+# Precompiled headers
+*.gch
+
+# ENet autotools cache
+src/enet/Makefile
+src/enet/autom4te.cache/output.0
+src/enet/autom4te.cache/requests
+src/enet/autom4te.cache/traces.0
+src/enet/config.log
+src/enet/config.status
+src/enet/libenet.pc
+src/enet/libtool

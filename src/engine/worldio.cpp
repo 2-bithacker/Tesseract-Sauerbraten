@@ -211,6 +211,24 @@ enum { OCTSAV_CHILDREN = 0, OCTSAV_EMPTY, OCTSAV_SOLID, OCTSAV_NORMAL, OCTSAV_LO
 enum { LMID_AMBIENT = 0, LMID_AMBIENT1, LMID_BRIGHT, LMID_BRIGHT1, LMID_DARK, LMID_DARK1, LMID_RESERVED };
 #define LAYER_DUP (1<<7)
 
+struct surfacecompat
+{
+    uchar texcoords[8];
+    uchar w, h;
+    ushort x, y;
+    uchar lmid, layer;
+};
+
+struct normalscompat
+{
+    bvec normals[4];
+};
+
+struct mergecompat
+{
+    ushort u1, u2, v1, v2;
+};
+
 struct polysurfacecompat
 {
     uchar lmid[2];
@@ -1148,7 +1166,7 @@ bool load_world(const char *mname, const char *cname)        // still supports a
             }
             int bpp = 3;
             if(type&(1<<4) && (type&0x0F)!=2) bpp = 4;
-            f->seek(bpp*LM_PACKW*LM_PACKH, SEEK_CUR);
+            f->seek(bpp*512*512, SEEK_CUR);
         }
 
         if(hdr.version >= 25 && hdr.numpvs > 0) loadpvs(f, hdr.numpvs);

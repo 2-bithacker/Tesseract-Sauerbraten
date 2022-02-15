@@ -2,14 +2,14 @@
 
 #include "engine.h"
 
-void cutogz(char *s) 
-{   
+void cutogz(char *s)
+{
     char *ogzp = strstr(s, ".ogz");
     if(ogzp) *ogzp = '\0';
-}   
-        
+}
+
 void getmapfilenames(const char *fname, const char *cname, char *pakname, char *mapname, char *cfgname)
-{   
+{
     if(!cname) cname = fname;
     string name;
     copystring(name, cname, 100);
@@ -28,10 +28,23 @@ void getmapfilenames(const char *fname, const char *cname, char *pakname, char *
     if(strpbrk(fname, "/\\")) copystring(mapname, fname);
     else formatstring(mapname)("base/%s", fname);
     cutogz(mapname);
-}   
+}
 
 static void fixent(entity &e, int version)
 {
+    if(version <= 10 && e.type >= 7) e.type++;
+    if(version <= 12 && e.type >= 8) e.type++;
+    if(version <= 14 && e.type >= ET_MAPMODEL && e.type <= 16)
+    {
+        if(e.type == 16) e.type = ET_MAPMODEL;
+        else e.type++;
+    }
+    if(version <= 20 && e.type >= ET_ENVMAP) e.type++;
+    if(version <= 21 && e.type >= ET_PARTICLES) e.type++;
+    if(version <= 22 && e.type >= ET_SOUND) e.type++;
+    if(version <= 23 && e.type >= ET_SPOTLIGHT) e.type++;
+    if(version <= 30 && (e.type == ET_MAPMODEL || e.type == ET_PLAYERSTART)) e.attr1 = (int(e.attr1)+180)%360;
+    if(version <= 31 && e.type == ET_MAPMODEL) { int yaw = (int(e.attr1)%360 + 360)%360 + 7; e.attr1 = yaw - yaw%15; }
 }
 
 bool loadents(const char *fname, vector<entity> &ents, uint *crc)
@@ -48,9 +61,31 @@ bool loadents(const char *fname, vector<entity> &ents, uint *crc)
     if(memcmp(hdr.magic, "OCTA", 4) || hdr.worldsize <= 0|| hdr.numents < 0) { conoutf(CON_ERROR, "map %s has malformatted header", ogzname); delete f; return false; }
     if(hdr.version<33) { conoutf(CON_ERROR, "map %s uses an unsupported map format version", ogzname); delete f; return false; }
     if(hdr.version>MAPVERSION) { conoutf(CON_ERROR, "map %s requires a newer version of Tesseract", ogzname); delete f; return false; }
-    if(f->read(&hdr.blendmap, sizeof(hdr) - 7*sizeof(int)) != int(sizeof(hdr) - 7*sizeof(int))) { conoutf(CON_ERROR, "map %s has malformatted header", ogzname); delete f; return false; }
+    compatheader chdr;
+    if(hdr.version <= 28)
+    {
+        if(f->read(&chdr.lightprecision, sizeof(chdr) - 7*sizeof(int)) != int(sizeof(chdr) - 7*sizeof(int))) { conoutf(CON_ERROR, "map %s has malformatted header", ogzname); delete f; return false; }
+    }
+    else
+    {
+        int extra = 0;
+        if(hdr.version <= 29) extra++;
+        if(f->read(&hdr.blendmap, sizeof(hdr) - (7+extra)*sizeof(int)) != int(sizeof(hdr) - (7+extra)*sizeof(int))) { conoutf(CON_ERROR, "map %s has malformatted header", ogzname); delete f; return false; }
+    }
 
-    lilswap(&hdr.blendmap, 3);
+    if(hdr.version <= 28)
+    {
+        lilswap(&chdr.lightprecision, 3);
+        hdr.blendmap = chdr.blendmap;
+        hdr.numvars = 0;
+        hdr.numvslots = 0;
+    }
+    else
+    {
+        lilswap(&hdr.blendmap, 2);
+        if(hdr.version <= 29) hdr.numvslots = 0;
+        else lilswap(&hdr.numvslots, 1);
+    }
 
     loopi(hdr.numvars)
     {
@@ -67,19 +102,33 @@ bool loadents(const char *fname, vector<entity> &ents, uint *crc)
     string gametype;
     copystring(gametype, "fps");
     bool samegame = true;
-    int len = f->getchar();
-    f->read(gametype, len+1);
+    int eif = 0;
+    if(hdr.version>=16)
+    {
+        int len = f->getchar();
+        f->read(gametype, len+1);
+    }
     if(strcmp(gametype, game::gameident()))
     {
         samegame = false;
         conoutf(CON_WARN, "WARNING: loading map from %s game, ignoring entities except for lights/mapmodels", gametype);
     }
-    int eif = f->getlil<ushort>();
-    int extrasize = f->getlil<ushort>();
-    f->seek(extrasize, SEEK_CUR);
+    if(hdr.version>=16)
+    {
+        eif = f->getlil<ushort>();
+        int extrasize = f->getlil<ushort>();
+        f->seek(extrasize, SEEK_CUR);
+    }
 
-    ushort nummru = f->getlil<ushort>();
-    f->seek(nummru*sizeof(ushort), SEEK_CUR);
+    if(hdr.version<14)
+    {
+        f->seek(256, SEEK_CUR);
+    }
+    else
+    {
+        ushort nummru = f->getlil<ushort>();
+        f->seek(nummru*sizeof(ushort), SEEK_CUR);
+    }
 
     loopi(min(hdr.numents, MAXENTS))
     {
@@ -93,7 +142,7 @@ bool loadents(const char *fname, vector<entity> &ents, uint *crc)
         {
             entities::readent(e, NULL, hdr.version);
         }
-        else if(e.type>=ET_GAMESPECIFIC)
+        else if(e.type>=ET_GAMESPECIFIC || hdr.version<=14)
         {
             ents.pop();
             continue;
@@ -105,7 +154,7 @@ bool loadents(const char *fname, vector<entity> &ents, uint *crc)
         f->seek(0, SEEK_END);
         *crc = f->getcrc();
     }
-    
+
     delete f;
 
     return true;
@@ -148,7 +197,7 @@ void mapcfgname()
 COMMAND(mapcfgname, "");
 
 void backup(char *name, char *backupname)
-{   
+{
     string backupfile;
     copystring(backupfile, findfile(backupname, "wb"));
     remove(backupfile);
@@ -189,13 +238,13 @@ void savec(cube *c, const ivec &o, int size, stream *f, bool nolms)
             if(!nolms)
             {
                 if(c[i].merged) oflags |= 0x80;
-                if(c[i].ext) loopj(6) 
+                if(c[i].ext) loopj(6)
                 {
                     const surfaceinfo &surf = c[i].ext->surfaces[j];
                     if(!surf.used()) continue;
-                    oflags |= 0x20; 
-                    surfmask |= 1<<j; 
-                    totalverts += surf.totalverts(); 
+                    oflags |= 0x20;
+                    surfmask |= 1<<j;
+                    totalverts += surf.totalverts();
                 }
             }
 
@@ -207,12 +256,12 @@ void savec(cube *c, const ivec &o, int size, stream *f, bool nolms)
                 f->putchar(oflags | OCTSAV_NORMAL);
                 f->write(c[i].edges, 12);
             }
-    
+
             loopj(6) f->putlil<ushort>(c[i].texture[j]);
 
             if(oflags&0x40) f->putlil<ushort>(c[i].material);
             if(oflags&0x80) f->putchar(c[i].merged);
-            if(oflags&0x20) 
+            if(oflags&0x20)
             {
                 f->putchar(surfmask);
                 f->putchar(totalverts);
@@ -220,18 +269,18 @@ void savec(cube *c, const ivec &o, int size, stream *f, bool nolms)
                 {
                     surfaceinfo surf = c[i].ext->surfaces[j];
                     vertinfo *verts = c[i].ext->verts() + surf.verts;
-                    int layerverts = surf.numverts&MAXFACEVERTS, numverts = surf.totalverts(), 
+                    int layerverts = surf.numverts&MAXFACEVERTS, numverts = surf.totalverts(),
                         vertmask = 0, vertorder = 0,
                         dim = dimension(j), vc = C[dim], vr = R[dim];
                     if(numverts)
                     {
-                        if(c[i].merged&(1<<j)) 
+                        if(c[i].merged&(1<<j))
                         {
                             vertmask |= 0x04;
                             if(layerverts == 4)
                             {
                                 ivec v[4] = { verts[0].getxyz(), verts[1].getxyz(), verts[2].getxyz(), verts[3].getxyz() };
-                                loopk(4) 
+                                loopk(4)
                                 {
                                     const ivec &v0 = v[k], &v1 = v[(k+1)&3], &v2 = v[(k+2)&3], &v3 = v[(k+3)&3];
                                     if(v1[vc] == v0[vc] && v1[vr] == v2[vr] && v3[vc] == v2[vc] && v3[vr] == v0[vr])
@@ -247,12 +296,12 @@ void savec(cube *c, const ivec &o, int size, stream *f, bool nolms)
                         {
                             int vis = visibletris(c[i], j, co.x, co.y, co.z, size);
                             if(vis&4 || faceconvexity(c[i], j) < 0) vertmask |= 0x01;
-                            if(layerverts < 4 && vis&2) vertmask |= 0x02; 
+                            if(layerverts < 4 && vis&2) vertmask |= 0x02;
                         }
                         bool matchnorm = true;
-                        loopk(numverts) 
-                        { 
-                            const vertinfo &v = verts[k]; 
+                        loopk(numverts)
+                        {
+                            const vertinfo &v = verts[k];
                             if(v.norm) { vertmask |= 0x80; if(v.norm != verts[0].norm) matchnorm = false; }
                         }
                         if(matchnorm) vertmask |= 0x08;
@@ -273,17 +322,17 @@ void savec(cube *c, const ivec &o, int size, stream *f, bool nolms)
                             f->putlil<ushort>(v2[vc]); f->putlil<ushort>(v2[vr]);
                             hasxyz = false;
                         }
-                    } 
+                    }
                     if(hasnorm && vertmask&0x08) { f->putlil<ushort>(verts[0].norm); hasnorm = false; }
                     if(hasxyz || hasnorm) loopk(layerverts)
                     {
                         const vertinfo &v = verts[(k+vertorder)%layerverts];
-                        if(hasxyz) 
-                        { 
-                            ivec xyz = v.getxyz(); 
-                            f->putlil<ushort>(xyz[vc]); f->putlil<ushort>(xyz[vr]); 
+                        if(hasxyz)
+                        {
+                            ivec xyz = v.getxyz();
+                            f->putlil<ushort>(xyz[vc]); f->putlil<ushort>(xyz[vr]);
                         }
-                        if(hasnorm) f->putlil<ushort>(v.norm); 
+                        if(hasnorm) f->putlil<ushort>(v.norm);
                     }
                 }
             }
@@ -294,6 +343,86 @@ void savec(cube *c, const ivec &o, int size, stream *f, bool nolms)
 }
 
 cube *loadchildren(stream *f, const ivec &co, int size, bool &failed);
+
+void convertoldsurfaces(cube &c, const ivec &co, int size, surfacecompat *srcsurfs, int hassurfs, normalscompat *normals, int hasnorms, mergecompat *merges, int hasmerges)
+{
+    surfaceinfo dstsurfs[6];
+    vertinfo verts[6*2*MAXFACEVERTS];
+    int totalverts = 0;
+    memset(dstsurfs, 0, sizeof(dstsurfs));
+    loopi(6) if((hassurfs|hasnorms|hasmerges)&(1<<i))
+    {
+        surfaceinfo &dst = dstsurfs[i];
+        vertinfo *curverts = NULL;
+        int numverts = 0;
+        surfacecompat *src = NULL;
+        if(hassurfs&(1<<i))
+        {
+            src = &srcsurfs[i];
+            if(src->layer&2) dst.numverts |= LAYER_BLEND;
+            else if(src->layer == 1) dst.numverts |= LAYER_BOTTOM;
+            else dst.numverts |= LAYER_TOP;
+        }
+        else dst.numverts |= LAYER_TOP;
+        bool uselms = hassurfs&(1<<i) && dst.numverts&~LAYER_TOP,
+             usemerges = hasmerges&(1<<i) && merges[i].u1 < merges[i].u2 && merges[i].v1 < merges[i].v2,
+             usenorms = hasnorms&(1<<i) && normals[i].normals[0] != bvec(128, 128, 128);
+        if(uselms || usemerges || usenorms)
+        {
+            ivec v[4], pos[4], e1, e2, e3, n, vo = ivec(co).mask(0xFFF).shl(3);
+            genfaceverts(c, i, v);
+            n.cross((e1 = v[1]).sub(v[0]), (e2 = v[2]).sub(v[0]));
+            if(usemerges)
+            {
+                const mergecompat &m = merges[i];
+                int offset = -n.dot(v[0].mul(size).add(vo)),
+                    dim = dimension(i), vc = C[dim], vr = R[dim];
+                loopk(4)
+                {
+                    const ivec &coords = facecoords[i][k];
+                    int cc = coords[vc] ? m.u2 : m.u1,
+                        rc = coords[vr] ? m.v2 : m.v1,
+                        dc = -(offset + n[vc]*cc + n[vr]*rc)/n[dim];
+                    ivec &mv = pos[k];
+                    mv[vc] = cc;
+                    mv[vr] = rc;
+                    mv[dim] = dc;
+                }
+            }
+            else
+            {
+                int convex = (e3 = v[0]).sub(v[3]).dot(n), vis = 3;
+                if(!convex)
+                {
+                    if(ivec().cross(e3, e2).iszero()) { if(!n.iszero()) vis = 1; }
+                    else if(n.iszero()) vis = 2;
+                }
+                int order = convex < 0 ? 1 : 0;
+                pos[0] = v[order].mul(size).add(vo);
+                pos[1] = vis&1 ? v[order+1].mul(size).add(vo) : pos[0];
+                pos[2] = v[order+2].mul(size).add(vo);
+                pos[3] = vis&2 ? v[(order+3)&3].mul(size).add(vo) : pos[0];
+            }
+            curverts = verts + totalverts;
+            loopk(4)
+            {
+                if(k > 0 && (pos[k] == pos[0] || pos[k] == pos[k-1])) continue;
+                vertinfo &dv = curverts[numverts++];
+                dv.setxyz(pos[k]);
+                dv.norm = usenorms && normals[i].normals[k] != bvec(128, 128, 128) ? encodenormal(normals[i].normals[k].tovec().normalize()) : 0;
+            }
+            dst.verts = totalverts;
+            dst.numverts |= numverts;
+            totalverts += numverts;
+        }
+    }
+    setsurfaces(c, dstsurfs, verts, totalverts);
+}
+
+static inline int convertoldmaterial(int mat)
+{
+    return ((mat&7)<<MATF_VOLUME_SHIFT) | (((mat>>3)&3)<<MATF_CLIP_SHIFT) | (((mat>>5)&7)<<MATF_FLAG_SHIFT);
+}
 
 void loadc(stream *f, cube &c, const ivec &co, int size, bool &failed)
 {
@@ -311,98 +440,202 @@ void loadc(stream *f, cube &c, const ivec &co, int size, bool &failed)
         case OCTSAV_NORMAL: f->read(c.edges, 12); break;
         default: failed = true; return;
     }
-    loopi(6) c.texture[i] = f->getlil<ushort>();
-    if(octsav&0x40) c.material = f->getlil<ushort>();
-    if(octsav&0x80) c.merged = f->getchar();
-    if(octsav&0x20)
+    loopi(6) c.texture[i] = mapversion<14 ? f->getchar() : f->getlil<ushort>();
+    if(mapversion < 7) f->seek(3, SEEK_CUR);
+    else if(mapversion <= 31)
     {
-        int surfmask, totalverts;
-        surfmask = f->getchar();
-        totalverts = f->getchar();
-        newcubeext(c, totalverts, false);
-        memset(c.ext->surfaces, 0, sizeof(c.ext->surfaces));
-        memset(c.ext->verts(), 0, totalverts*sizeof(vertinfo));
-        int offset = 0;
-        loopi(6) if(surfmask&(1<<i)) 
+        uchar mask = f->getchar();
+        if(mask & 0x80)
         {
-            surfaceinfo &surf = c.ext->surfaces[i];
-            polysurfacecompat psurf;
-            f->read(&psurf, sizeof(polysurfacecompat));
-            surf.verts = psurf.verts;
-            surf.numverts = psurf.numverts;
-            int vertmask = surf.verts, numverts = surf.totalverts();
-            if(!numverts) { surf.verts = 0; continue; }
-            surf.verts = offset;
-            vertinfo *verts = c.ext->verts() + offset;
-            offset += numverts;
-            ivec v[4], n;
-            int layerverts = surf.numverts&MAXFACEVERTS, dim = dimension(i), vc = C[dim], vr = R[dim], bias = 0;
-            genfaceverts(c, i, v);
-            bool hasxyz = (vertmask&0x04)!=0, hasuv = (vertmask&0x40)!=0, hasnorm = (vertmask&0x80)!=0;
-            if(hasxyz)
-            { 
-                ivec e1, e2, e3;
-                n.cross((e1 = v[1]).sub(v[0]), (e2 = v[2]).sub(v[0]));   
-                if(n.iszero()) n.cross(e2, (e3 = v[3]).sub(v[0]));
-                bias = -n.dot(ivec(v[0]).mul(size).add(ivec(co).mask(0xFFF).shl(3)));
-            }
-            else
+            int mat = f->getchar();
+            if(mapversion < 27)
             {
-                int vis = layerverts < 4 ? (vertmask&0x02 ? 2 : 1) : 3, order = vertmask&0x01 ? 1 : 0, k = 0;
-                ivec vo = ivec(co).mask(0xFFF).shl(3);
-                verts[k++].setxyz(v[order].mul(size).add(vo));
-                if(vis&1) verts[k++].setxyz(v[order+1].mul(size).add(vo));
-                verts[k++].setxyz(v[order+2].mul(size).add(vo));
-                if(vis&2) verts[k++].setxyz(v[(order+3)&3].mul(size).add(vo));
+                static ushort matconv[] = { MAT_AIR, MAT_WATER, MAT_CLIP, MAT_GLASS|MAT_CLIP, MAT_NOCLIP, MAT_LAVA|MAT_DEATH, MAT_GAMECLIP, MAT_DEATH };
+                c.material = size_t(mat) < sizeof(matconv)/sizeof(matconv[0]) ? matconv[mat] : MAT_AIR;
             }
-            if(layerverts == 4)
+            else c.material = convertoldmaterial(mat);
+        }
+        surfacecompat surfaces[12];
+        normalscompat normals[6];
+        mergecompat merges[6];
+        int hassurfs = 0, hasnorms = 0, hasmerges = 0;
+        if(mask & 0x3F)
+        {
+            int numsurfs = 6;
+            loopi(numsurfs)
             {
-                if(hasxyz && vertmask&0x01)
+                if(i >= 6 || mask & (1 << i))
                 {
-                    ushort c1 = f->getlil<ushort>(), r1 = f->getlil<ushort>(), c2 = f->getlil<ushort>(), r2 = f->getlil<ushort>();
-                    ivec xyz;
-                    xyz[vc] = c1; xyz[vr] = r1; xyz[dim] = -(bias + n[vc]*xyz[vc] + n[vr]*xyz[vr])/n[dim];
-                    verts[0].setxyz(xyz);
-                    xyz[vc] = c1; xyz[vr] = r2; xyz[dim] = -(bias + n[vc]*xyz[vc] + n[vr]*xyz[vr])/n[dim];
-                    verts[1].setxyz(xyz);
-                    xyz[vc] = c2; xyz[vr] = r2; xyz[dim] = -(bias + n[vc]*xyz[vc] + n[vr]*xyz[vr])/n[dim];
-                    verts[2].setxyz(xyz);
-                    xyz[vc] = c2; xyz[vr] = r1; xyz[dim] = -(bias + n[vc]*xyz[vc] + n[vr]*xyz[vr])/n[dim];
-                    verts[3].setxyz(xyz);
-                    hasxyz = false;
+                    f->read(&surfaces[i], sizeof(surfacecompat));
+                    lilswap(&surfaces[i].x, 2);
+                    if(mapversion < 10) ++surfaces[i].lmid;
+                    if(mapversion < 18)
+                    {
+                        if(surfaces[i].lmid >= LMID_AMBIENT1) ++surfaces[i].lmid;
+                        if(surfaces[i].lmid >= LMID_BRIGHT1) ++surfaces[i].lmid;
+                    }
+                    if(mapversion < 19)
+                    {
+                        if(surfaces[i].lmid >= LMID_DARK) surfaces[i].lmid += 2;
+                    }
+                    if(i < 6)
+                    {
+                        if(mask & 0x40) { hasnorms |= 1<<i; f->read(&normals[i], sizeof(normalscompat)); }
+                        if(surfaces[i].layer != 0 || surfaces[i].lmid != LMID_AMBIENT)
+                            hassurfs |= 1<<i;
+                        if(surfaces[i].layer&2) numsurfs++;
+                    }
                 }
-                if(hasuv && vertmask&0x02)
-                {
-                    loopk(4) f->getlil<ushort>();
-                    if(surf.numverts&LAYER_DUP) loopk(4) f->getlil<ushort>();
-                    hasuv = false;
-                } 
-            }
-            if(hasnorm && vertmask&0x08)
-            {
-                ushort norm = f->getlil<ushort>();
-                loopk(layerverts) verts[k].norm = norm;
-                hasnorm = false;
-            }
-            if(hasxyz || hasuv || hasnorm) loopk(layerverts)
-            {
-                vertinfo &v = verts[k];
-                if(hasxyz)
-                {
-                    ivec xyz;
-                    xyz[vc] = f->getlil<ushort>(); xyz[vr] = f->getlil<ushort>();
-                    xyz[dim] = -(bias + n[vc]*xyz[vc] + n[vr]*xyz[vr])/n[dim];
-                    v.setxyz(xyz);
-                }
-                if(hasuv) { f->getlil<ushort>(); f->getlil<ushort>(); }    
-                if(hasnorm) v.norm = f->getlil<ushort>();
-            }
-            if(surf.numverts&LAYER_DUP) loopk(layerverts)
-            {
-                if(hasuv) { f->getlil<ushort>(); f->getlil<ushort>(); }
             }
         }
-    }    
+        if(mapversion <= 8) edgespan2vectorcube(c);
+        if(mapversion <= 11)
+        {
+            swap(c.faces[0], c.faces[2]);
+            swap(c.texture[0], c.texture[4]);
+            swap(c.texture[1], c.texture[5]);
+            if(hassurfs&0x33)
+            {
+                swap(surfaces[0], surfaces[4]);
+                swap(surfaces[1], surfaces[5]);
+                hassurfs = (hassurfs&~0x33) | ((hassurfs&0x30)>>4) | ((hassurfs&0x03)<<4);
+            }
+        }
+        if(mapversion >= 20)
+        {
+            if(octsav&0x80)
+            {
+                int merged = f->getchar();
+                c.merged = merged&0x3F;
+                if(merged&0x80)
+                {
+                    int mask = f->getchar();
+                    if(mask)
+                    {
+                        hasmerges = mask&0x3F;
+                        loopi(6) if(mask&(1<<i))
+                        {
+                            mergecompat *m = &merges[i];
+                            f->read(m, sizeof(mergecompat));
+                            lilswap(&m->u1, 4);
+                            if(mapversion <= 25)
+                            {
+                                int uorigin = m->u1 & 0xE000, vorigin = m->v1 & 0xE000;
+                                m->u1 = (m->u1 - uorigin) << 2;
+                                m->u2 = (m->u2 - uorigin) << 2;
+                                m->v1 = (m->v1 - vorigin) << 2;
+                                m->v2 = (m->v2 - vorigin) << 2;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        if(hassurfs || hasnorms || hasmerges)
+            convertoldsurfaces(c, co, size, surfaces, hassurfs, normals, hasnorms, merges, hasmerges);
+    }
+    else
+    {
+        if(octsav&0x40)
+        {
+            if(mapversion <= 32)
+            {
+                int mat = f->getchar();
+                c.material = convertoldmaterial(mat);
+            }
+            else c.material = f->getlil<ushort>();
+        }
+        if(octsav&0x80) c.merged = f->getchar();
+        if(octsav&0x20)
+        {
+            int surfmask, totalverts;
+            surfmask = f->getchar();
+            totalverts = f->getchar();
+            newcubeext(c, totalverts, false);
+            memset(c.ext->surfaces, 0, sizeof(c.ext->surfaces));
+            memset(c.ext->verts(), 0, totalverts*sizeof(vertinfo));
+            int offset = 0;
+            loopi(6) if(surfmask&(1<<i))
+            {
+                surfaceinfo &surf = c.ext->surfaces[i];
+                polysurfacecompat psurf;
+                f->read(&psurf, sizeof(polysurfacecompat));
+                surf.verts = psurf.verts;
+                surf.numverts = psurf.numverts;
+                int vertmask = surf.verts, numverts = surf.totalverts();
+                if(!numverts) { surf.verts = 0; continue; }
+                surf.verts = offset;
+                vertinfo *verts = c.ext->verts() + offset;
+                offset += numverts;
+                ivec v[4], n;
+                int layerverts = surf.numverts&MAXFACEVERTS, dim = dimension(i), vc = C[dim], vr = R[dim], bias = 0;
+                genfaceverts(c, i, v);
+                bool hasxyz = (vertmask&0x04)!=0, hasuv = (vertmask&0x40)!=0, hasnorm = (vertmask&0x80)!=0;
+                if(hasxyz)
+                {
+                    ivec e1, e2, e3;
+                    n.cross((e1 = v[1]).sub(v[0]), (e2 = v[2]).sub(v[0]));
+                    if(n.iszero()) n.cross(e2, (e3 = v[3]).sub(v[0]));
+                    bias = -n.dot(ivec(v[0]).mul(size).add(ivec(co).mask(0xFFF).shl(3)));
+                }
+                else
+                {
+                    int vis = layerverts < 4 ? (vertmask&0x02 ? 2 : 1) : 3, order = vertmask&0x01 ? 1 : 0, k = 0;
+                    ivec vo = ivec(co).mask(0xFFF).shl(3);
+                    verts[k++].setxyz(v[order].mul(size).add(vo));
+                    if(vis&1) verts[k++].setxyz(v[order+1].mul(size).add(vo));
+                    verts[k++].setxyz(v[order+2].mul(size).add(vo));
+                    if(vis&2) verts[k++].setxyz(v[(order+3)&3].mul(size).add(vo));
+                }
+                if(layerverts == 4)
+                {
+                    if(hasxyz && vertmask&0x01)
+                    {
+                        ushort c1 = f->getlil<ushort>(), r1 = f->getlil<ushort>(), c2 = f->getlil<ushort>(), r2 = f->getlil<ushort>();
+                        ivec xyz;
+                        xyz[vc] = c1; xyz[vr] = r1; xyz[dim] = -(bias + n[vc]*xyz[vc] + n[vr]*xyz[vr])/n[dim];
+                        verts[0].setxyz(xyz);
+                        xyz[vc] = c1; xyz[vr] = r2; xyz[dim] = -(bias + n[vc]*xyz[vc] + n[vr]*xyz[vr])/n[dim];
+                        verts[1].setxyz(xyz);
+                        xyz[vc] = c2; xyz[vr] = r2; xyz[dim] = -(bias + n[vc]*xyz[vc] + n[vr]*xyz[vr])/n[dim];
+                        verts[2].setxyz(xyz);
+                        xyz[vc] = c2; xyz[vr] = r1; xyz[dim] = -(bias + n[vc]*xyz[vc] + n[vr]*xyz[vr])/n[dim];
+                        verts[3].setxyz(xyz);
+                        hasxyz = false;
+                    }
+                    if(hasuv && vertmask&0x02)
+                    {
+                        loopk(4) f->getlil<ushort>();
+                        if(surf.numverts&LAYER_DUP) loopk(4) f->getlil<ushort>();
+                        hasuv = false;
+                    }
+                }
+                if(hasnorm && vertmask&0x08)
+                {
+                    ushort norm = f->getlil<ushort>();
+                    loopk(layerverts) verts[k].norm = norm;
+                    hasnorm = false;
+                }
+                if(hasxyz || hasuv || hasnorm) loopk(layerverts)
+                {
+                    vertinfo &v = verts[k];
+                    if(hasxyz)
+                    {
+                        ivec xyz;
+                        xyz[vc] = f->getlil<ushort>(); xyz[vr] = f->getlil<ushort>();
+                        xyz[dim] = -(bias + n[vc]*xyz[vc] + n[vr]*xyz[vr])/n[dim];
+                        v.setxyz(xyz);
+                    }
+                    if(hasuv) { f->getlil<ushort>(); f->getlil<ushort>(); }
+                    if(hasnorm) v.norm = f->getlil<ushort>();
+                }
+                if(surf.numverts&LAYER_DUP) loopk(layerverts)
+                {
+                    if(hasuv) { f->getlil<ushort>(); f->getlil<ushort>(); }
+                }
+            }
+        }
+    }
 
     c.children = (haschildren ? loadchildren(f, co, size>>1, failed) : NULL);
 }
@@ -410,7 +643,7 @@ void loadc(stream *f, cube &c, const ivec &co, int size, bool &failed)
 cube *loadchildren(stream *f, const ivec &co, int size, bool &failed)
 {
     cube *c = newcubes();
-    loopi(8) 
+    loopi(8)
     {
         loadc(f, c[i], ivec(i, co.x, co.y, co.z, size), size, failed);
         if(failed) break;
@@ -451,7 +684,7 @@ void savevslot(stream *f, VSlot &vs, int prev)
         f->putlil<float>(vs.alphafront);
         f->putlil<float>(vs.alphaback);
     }
-    if(vs.changed & (1<<VSLOT_COLOR)) 
+    if(vs.changed & (1<<VSLOT_COLOR))
     {
         loopk(3) f->putlil<float>(vs.colorscale[k]);
     }
@@ -477,7 +710,7 @@ void savevslots(stream *f, int numvslots)
             do vs = vs->next; while(vs && vs->index >= numvslots);
             if(!vs) break;
             prev[vs->index] = cur->index;
-        } 
+        }
     }
     int lastroot = 0;
     loopi(numvslots)
@@ -491,7 +724,7 @@ void savevslots(stream *f, int numvslots)
     if(lastroot < numvslots) f->putlil<int>(-(numvslots - lastroot));
     delete[] prev;
 }
-            
+
 void loadvslot(stream *f, VSlot &vs, int changed)
 {
     vs.changed = changed;
@@ -527,7 +760,7 @@ void loadvslot(stream *f, VSlot &vs, int changed)
         vs.alphafront = f->getlil<float>();
         vs.alphaback = f->getlil<float>();
     }
-    if(vs.changed & (1<<VSLOT_COLOR)) 
+    if(vs.changed & (1<<VSLOT_COLOR))
     {
         loopk(3) vs.colorscale[k] = f->getlil<float>();
     }
@@ -553,7 +786,7 @@ void loadvslots(stream *f, int numvslots)
         else
         {
             prev[vslots.length()] = f->getlil<int>();
-            loadvslot(f, *vslots.add(new VSlot(NULL, vslots.length())), changed);    
+            loadvslot(f, *vslots.add(new VSlot(NULL, vslots.length())), changed);
             numvslots--;
         }
     }
@@ -592,14 +825,14 @@ bool save_world(const char *mname, bool nolms)
     hdr.blendmap = shouldsaveblendmap();
     hdr.numvars = 0;
     hdr.numvslots = numvslots;
-    enumerate(idents, ident, id, 
+    enumerate(idents, ident, id,
     {
         if((id.type == ID_VAR || id.type == ID_FVAR || id.type == ID_SVAR) && id.flags&IDF_OVERRIDE && !(id.flags&IDF_READONLY) && id.flags&IDF_OVERRIDDEN) hdr.numvars++;
     });
     lilswap(&hdr.version, 9);
     f->write(&hdr, sizeof(hdr));
-   
-    enumerate(idents, ident, id, 
+
+    enumerate(idents, ident, id,
     {
         if((id.type!=ID_VAR && id.type!=ID_FVAR && id.type!=ID_SVAR) || !(id.flags&IDF_OVERRIDE) || id.flags&IDF_READONLY || !(id.flags&IDF_OVERRIDDEN)) continue;
         f->putchar(id.type);
@@ -634,7 +867,7 @@ bool save_world(const char *mname, bool nolms)
     game::writegamedata(extras);
     f->putlil<ushort>(extras.length());
     f->write(extras.getbuf(), extras.length());
-    
+
     f->putlil<ushort>(texmru.length());
     loopv(texmru) f->putlil<ushort>(texmru[i]);
     char *ebuf = new char[entities::extraentinfosize()];
@@ -657,7 +890,7 @@ bool save_world(const char *mname, bool nolms)
     renderprogress(0, "saving octree...");
     savec(worldroot, ivec(0, 0, 0), worldsize>>1, f, nolms);
 
-    if(!nolms) 
+    if(!nolms)
     {
         if(getnumviewcells()>0) { renderprogress(0, "saving pvs..."); savepvs(f); }
     }
@@ -683,9 +916,18 @@ bool load_world(const char *mname, const char *cname)        // still supports a
     if(f->read(&hdr, 7*sizeof(int))!=int(7*sizeof(int))) { conoutf(CON_ERROR, "map %s has malformatted header", ogzname); delete f; return false; }
     lilswap(&hdr.version, 6);
     if(memcmp(hdr.magic, "OCTA", 4) || hdr.worldsize <= 0|| hdr.numents < 0) { conoutf(CON_ERROR, "map %s has malformatted header", ogzname); delete f; return false; }
-    if(hdr.version<33) { conoutf(CON_ERROR, "map %s uses an unsupported map format version", ogzname); delete f; return false; }
     if(hdr.version>MAPVERSION) { conoutf(CON_ERROR, "map %s requires a newer version of Tesseract", ogzname); delete f; return false; }
-    if(f->read(&hdr.blendmap, sizeof(hdr) - 7*sizeof(int)) != int(sizeof(hdr) - 7*sizeof(int))) { conoutf(CON_ERROR, "map %s has malformatted header", ogzname); delete f; return false; }
+    compatheader chdr;
+    if(hdr.version <= 28)
+    {
+        if(f->read(&chdr.lightprecision, sizeof(chdr) - 7*sizeof(int)) != int(sizeof(chdr) - 7*sizeof(int))) { conoutf(CON_ERROR, "map %s has malformatted header", ogzname); delete f; return false; }
+    }
+    else
+    {
+        int extra = 0;
+        if(hdr.version <= 29) extra++;
+        if(f->read(&hdr.blendmap, sizeof(hdr) - (7+extra)*sizeof(int)) != int(sizeof(hdr) - (7+extra)*sizeof(int))) { conoutf(CON_ERROR, "map %s has malformatted header", ogzname); delete f; return false; }
+    }
 
     resetmap();
 
@@ -694,7 +936,36 @@ bool load_world(const char *mname, const char *cname)        // still supports a
 
     setvar("mapversion", hdr.version, true, false);
 
-    lilswap(&hdr.blendmap, 3);
+    if(hdr.version <= 28)
+    {
+        lilswap(&chdr.lightprecision, 3);
+        if(chdr.lightprecision) setvar("lightprecision", chdr.lightprecision);
+        if(chdr.lighterror) setvar("lighterror", chdr.lighterror);
+        if(chdr.bumperror) setvar("bumperror", chdr.bumperror);
+        setvar("lightlod", chdr.lightlod);
+        if(chdr.ambient) setvar("ambient", chdr.ambient);
+        setvar("skylight", (int(chdr.skylight[0])<<16) | (int(chdr.skylight[1])<<8) | int(chdr.skylight[2]));
+        setvar("watercolour", (int(chdr.watercolour[0])<<16) | (int(chdr.watercolour[1])<<8) | int(chdr.watercolour[2]), true);
+        setvar("waterfallcolour", (int(chdr.waterfallcolour[0])<<16) | (int(chdr.waterfallcolour[1])<<8) | int(chdr.waterfallcolour[2]));
+        setvar("lavacolour", (int(chdr.lavacolour[0])<<16) | (int(chdr.lavacolour[1])<<8) | int(chdr.lavacolour[2]));
+        setvar("fullbright", 0, true);
+        if(chdr.lerpsubdivsize || chdr.lerpangle) setvar("lerpangle", chdr.lerpangle);
+        if(chdr.lerpsubdivsize)
+        {
+            setvar("lerpsubdiv", chdr.lerpsubdiv);
+            setvar("lerpsubdivsize", chdr.lerpsubdivsize);
+        }
+        setsvar("maptitle", chdr.maptitle);
+        hdr.blendmap = chdr.blendmap;
+        hdr.numvars = 0;
+        hdr.numvslots = 0;
+    }
+    else
+    {
+        lilswap(&hdr.blendmap, 2);
+        if(hdr.version <= 29) hdr.numvslots = 0;
+        else lilswap(&hdr.numvslots, 1);
+    }
 
     renderprogress(0, "clearing world...");
 
@@ -707,7 +978,7 @@ bool load_world(const char *mname, const char *cname)        // still supports a
     setvar("mapscale", worldscale, true, false);
 
     renderprogress(0, "loading vars...");
- 
+
     loopi(hdr.numvars)
     {
         int type = f->getchar(), ilen = f->getlil<ushort>();
@@ -738,7 +1009,7 @@ bool load_world(const char *mname, const char *cname)        // still supports a
             case ID_VAR:
             {
                 int i = val.getint();
-                if(id->minval <= id->maxval && i >= id->minval && i <= id->maxval) 
+                if(id->minval <= id->maxval && i >= id->minval && i <= id->maxval)
                 {
                     setvar(name, i);
                     if(dbgvars) conoutf(CON_DEBUG, "read var %s: %d", name, i);
@@ -748,7 +1019,7 @@ bool load_world(const char *mname, const char *cname)        // still supports a
             case ID_FVAR:
             {
                 float f = val.getfloat();
-                if(id->minvalf <= id->maxvalf && f >= id->minvalf && f <= id->maxvalf) 
+                if(id->minvalf <= id->maxvalf && f >= id->minvalf && f <= id->maxvalf)
                 {
                     setfvar(name, f);
                     if(dbgvars) conoutf(CON_DEBUG, "read fvar %s: %f", name, f);
@@ -766,22 +1037,38 @@ bool load_world(const char *mname, const char *cname)        // still supports a
     string gametype;
     copystring(gametype, "fps");
     bool samegame = true;
-    int len = f->getchar();
-    f->read(gametype, len+1);
+    int eif = 0;
+    if(hdr.version>=16)
+    {
+        int len = f->getchar();
+        f->read(gametype, len+1);
+    }
     if(strcmp(gametype, game::gameident())!=0)
     {
         samegame = false;
         conoutf(CON_WARN, "WARNING: loading map from %s game, ignoring entities except for lights/mapmodels", gametype);
     }
-    int eif = f->getlil<ushort>();
-    int extrasize = f->getlil<ushort>();
-    vector<char> extras;
-    f->read(extras.pad(extrasize), extrasize);
-    if(samegame) game::readgamedata(extras);
-   
+    if(hdr.version>=16)
+    {
+        eif = f->getlil<ushort>();
+        int extrasize = f->getlil<ushort>();
+        vector<char> extras;
+        f->read(extras.pad(extrasize), extrasize);
+        if(samegame) game::readgamedata(extras);
+    }
+
     texmru.shrink(0);
-    ushort nummru = f->getlil<ushort>();
-    loopi(nummru) texmru.add(f->getlil<ushort>());
+    if(hdr.version<14)
+    {
+        uchar oldtl[256];
+        f->read(oldtl, sizeof(oldtl));
+        loopi(256) texmru.add(oldtl[i]);
+    }
+    else
+    {
+        ushort nummru = f->getlil<ushort>();
+        loopi(nummru) texmru.add(f->getlil<ushort>());
+    }
 
     renderprogress(0, "loading entities...");
 
@@ -806,7 +1093,7 @@ bool load_world(const char *mname, const char *cname)        // still supports a
         else
         {
             if(eif > 0) f->seek(eif, SEEK_CUR);
-            if(e.type>=ET_GAMESPECIFIC)
+            if(e.type>=ET_GAMESPECIFIC || hdr.version<=14)
             {
                 entities::deleteentity(ents.pop());
                 continue;
@@ -819,10 +1106,16 @@ bool load_world(const char *mname, const char *cname)        // still supports a
                 conoutf(CON_WARN, "warning: ent outside of world: enttype[%s] index %d (%f, %f, %f)", entities::entname(e.type), i, e.o.x, e.o.y, e.o.z);
             }
         }
+        if(hdr.version <= 14 && e.type == ET_MAPMODEL)
+        {
+            e.o.z += e.attr3;
+            if(e.attr4) conoutf(CON_WARN, "warning: mapmodel ent (index %d) uses texture slot %d", i, e.attr4);
+            e.attr3 = e.attr4 = 0;
+        }
     }
     if(ebuf) delete[] ebuf;
 
-    if(hdr.numents > MAXENTS) 
+    if(hdr.numents > MAXENTS)
     {
         conoutf(CON_WARN, "warning: map has %d entities", hdr.numents);
         f->seek((hdr.numents-MAXENTS)*(samegame ? sizeof(entity) + einfosize : eif), SEEK_CUR);
@@ -835,27 +1128,31 @@ bool load_world(const char *mname, const char *cname)        // still supports a
     bool failed = false;
     worldroot = loadchildren(f, ivec(0, 0, 0), hdr.worldsize>>1, failed);
     if(failed) conoutf(CON_ERROR, "garbage in map");
- 
+
     renderprogress(0, "validating...");
     validatec(worldroot, hdr.worldsize>>1);
 
     if(!failed)
     {
-        loopi(hdr.lightmaps)
+        if(hdr.version >= 7) loopi(hdr.lightmaps)
         {
-            int type = f->getchar();
-            if(type&0x80)
+            int type = 0;
+            if(hdr.version >= 17)
             {
-                f->getlil<ushort>();
-                f->getlil<ushort>();
+                type = f->getchar();
+                if(hdr.version >= 20 && type&0x80)
+                {
+                    f->getlil<ushort>();
+                    f->getlil<ushort>();
+                }
             }
             int bpp = 3;
             if(type&(1<<4) && (type&0x0F)!=2) bpp = 4;
             f->seek(bpp*LM_PACKW*LM_PACKH, SEEK_CUR);
         }
 
-        if(hdr.numpvs > 0) loadpvs(f, hdr.numpvs);
-        if(hdr.blendmap) loadblendmap(f, hdr.blendmap);
+        if(hdr.version >= 25 && hdr.numpvs > 0) loadpvs(f, hdr.numpvs);
+        if(hdr.version >= 28 && hdr.blendmap) loadblendmap(f, hdr.blendmap);
     }
 
     mapcrc = f->getcrc();
@@ -869,7 +1166,7 @@ bool load_world(const char *mname, const char *cname)        // still supports a
     execfile("data/default_map_settings.cfg", false);
     execfile(cfgname, false);
     identflags &= ~IDF_OVERRIDDEN;
-   
+
     preloadusedmapmodels(true);
 
     game::preload();
@@ -887,7 +1184,7 @@ bool load_world(const char *mname, const char *cname)        // still supports a
     if(maptitle[0] && strcmp(maptitle, "Untitled Map by Unknown")) conoutf(CON_ECHO, "%s", maptitle);
 
     startmap(cname ? cname : mname);
-    
+
     return true;
 }
 
@@ -900,12 +1197,12 @@ COMMAND(savecurrentmap, "");
 void writeobj(char *name)
 {
     defformatstring(fname)("%s.obj", name);
-    stream *f = openfile(path(fname), "w"); 
+    stream *f = openfile(path(fname), "w");
     if(!f) return;
     f->printf("# obj file of Cube 2 level\n\n");
     defformatstring(mtlname)("%s.mtl", name);
     path(mtlname);
-    f->printf("mtllib %s\n\n", mtlname); 
+    f->printf("mtllib %s\n\n", mtlname);
     extern vector<vtxarray *> valist;
     vector<vec> verts;
     vector<vec2> texcoords;
@@ -933,7 +1230,7 @@ void writeobj(char *name)
                 const vec2 &tc = v.tc;
                 ivec2 &key = keys.add();
                 key.x = shareverts.access(pos, verts.length());
-                if(key.x == verts.length()) 
+                if(key.x == verts.length())
                 {
                     verts.add(pos);
                     loopl(3)
@@ -957,12 +1254,12 @@ void writeobj(char *name)
         if(v.y != floor(v.y)) f->printf("v %.3f ", -v.y); else f->printf("v %d ", int(-v.y));
         if(v.z != floor(v.z)) f->printf("%.3f ", v.z); else f->printf("%d ", int(v.z));
         if(v.x != floor(v.x)) f->printf("%.3f\n", v.x); else f->printf("%d\n", int(v.x));
-    } 
+    }
     f->printf("\n");
     loopv(texcoords)
     {
         const vec2 &tc = texcoords[i];
-        f->printf("vt %.6f %.6f\n", tc.x, 1-tc.y);  
+        f->printf("vt %.6f %.6f\n", tc.x, 1-tc.y);
     }
     f->printf("\n");
 
@@ -991,11 +1288,10 @@ void writeobj(char *name)
         f->printf("newmtl slot%d\n", usedmtl[i]);
         f->printf("map_Kd %s\n", vslot.slot->sts.empty() ? notexture->name : path(makerelpath("packages", vslot.slot->sts[0].name)));
         f->printf("\n");
-    } 
+    }
     delete f;
-}  
-    
-COMMAND(writeobj, "s"); 
+}
+
+COMMAND(writeobj, "s");
 
 #endif
-

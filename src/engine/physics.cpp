@@ -13,7 +13,7 @@ static int clipcacheversion = -2;
 static inline clipplanes &getclipplanes(const cube &c, const ivec &o, int size, bool collide = true, int offset = 0)
 {
     clipplanes &p = clipcache[int(&c - worldroot)&(MAXCLIPPLANES-1)];
-    if(p.owner != &c || p.version != clipcacheversion+offset) 
+    if(p.owner != &c || p.version != clipcacheversion+offset)
     {
         p.owner = &c;
         p.version = clipcacheversion+offset;
@@ -369,8 +369,8 @@ ShadowRayCache *newshadowraycache() { return new ShadowRayCache; }
 
 void freeshadowraycache(ShadowRayCache *&cache) { delete cache; cache = NULL; }
 
-void resetshadowraycache(ShadowRayCache *cache) 
-{ 
+void resetshadowraycache(ShadowRayCache *cache)
+{
     cache->version++;
     if(!cache->version)
     {
@@ -799,7 +799,7 @@ static bool fuzzycollideellipse(physent *d, const vec &dir, float cutoff, const 
     E entvol(d);
     mpr::ModelEllipse mdlvol(o, center, radius, yaw, pitch, roll);
     if(!mpr::collide(entvol, mdlvol)) return true;
- 
+
     wall = vec(0, 0, 0);
     float bestdist = -1e10f;
     loopi(3)
@@ -810,7 +810,7 @@ static bool fuzzycollideellipse(physent *d, const vec &dir, float cutoff, const 
         {
             case 0: w = mdlvol.orient.c; dist = -radius.z; break;
             case 1: w = vec(mdlvol.orient.c).neg(); dist = -radius.z; break;
-            case 2: 
+            case 2:
             {
                 vec2 ln(mdlvol.orient.transform(entvol.center().sub(mdlvol.o)));
                 float r = ln.magnitude();
@@ -819,7 +819,7 @@ static bool fuzzycollideellipse(physent *d, const vec &dir, float cutoff, const 
                 w = mdlvol.orient.transposedtransform(lw);
                 dist = -vec2(ln.x*radius.x, ln.y*radius.y).dot(lw)/r;
                 break;
-            }   
+            }
         }
         vec pw = entvol.supportpoint(vec(w).neg());
         dist += w.dot(vec(pw).sub(mdlvol.o));
@@ -864,7 +864,7 @@ bool mmcollide(physent *d, const vec &dir, float cutoff, octaentities &oc) // co
                 if(m->ellipsecollide)
                 {
                     //if(!mmcollide<mpr::EntCylinder, mpr::ModelEllipse>(d, dir, e, center, radius, yaw, pitch, roll)) return false;
-                    if(pitch || roll) 
+                    if(pitch || roll)
                     {
                         if(!fuzzycollideellipse<mpr::EntCapsule>(d, dir, cutoff, e.o, center, radius, yaw, pitch, roll)) return false;
                     }
@@ -874,7 +874,7 @@ bool mmcollide(physent *d, const vec &dir, float cutoff, octaentities &oc) // co
                 else if(pitch || roll)
                 {
                     if(!fuzzycolliderect<mpr::EntCapsule>(d, dir, cutoff, e.o, center, radius, yaw, pitch, roll)) return false;
-                } 
+                }
                 else if(!ellipserectcollide(d, dir, e.o, center, yaw, radius.x, radius.y, radius.z, radius.z)) return false;
                 break;
             case COLLIDE_OBB:
@@ -961,7 +961,7 @@ static inline bool clampcollide(const clipplanes &p, const E &entvol, const plan
     }
     return false;
 }
-    
+
 template<class E>
 static bool fuzzycollideplanes(physent *d, const vec &dir, float cutoff, const cube &c, const ivec &co, int size) // collide with deformed cube geometry
 {
@@ -1401,7 +1401,7 @@ bool trystepdown(physent *d, vec &dir, float step, float xy, float z, bool init 
             stepfloor.normalize();
             if(d->physstate >= PHYS_SLOPE && d->floor != stepfloor)
             {
-                // prevent alternating step-down/step-up states if player would keep bumping into the same floor 
+                // prevent alternating step-down/step-up states if player would keep bumping into the same floor
                 vec stepped(d->o);
                 d->o.z -= 0.5f;
                 d->zmargin = -0.5f;
@@ -1587,47 +1587,6 @@ bool move(physent *d, vec &dir)
     return !collided;
 }
 
-void crouchplayer(physent *pl, int moveres, bool local)
-{
-    if(!curtime) return;
-    float minheight = pl->maxheight * CROUCHHEIGHT, speed = (pl->maxheight - minheight) * curtime / float(CROUCHTIME);
-    if(pl->crouching < 0)
-    {
-        if(pl->eyeheight > minheight)
-        {
-            float diff = min(pl->eyeheight - minheight, speed);
-            pl->eyeheight -= diff;
-            if(pl->physstate > PHYS_FALL)
-            {
-                pl->o.z -= diff;
-                pl->newpos.z -= diff;
-            }
-        }
-    }
-    else if(pl->eyeheight < pl->maxheight)
-    {
-        float diff = min(pl->maxheight - pl->eyeheight, speed), step = diff/moveres;
-        pl->eyeheight += diff;
-        if(pl->physstate > PHYS_FALL)
-        {
-            pl->o.z += diff;
-            pl->newpos.z += diff;
-        }
-        pl->crouching = 0;
-        loopi(moveres)
-        {
-            if(collide(pl, vec(0, 0, pl->physstate <= PHYS_FALL ? -1 : 1), 0, true)) break;
-            pl->crouching = 1;
-            pl->eyeheight -= step;
-            if(pl->physstate > PHYS_FALL)
-            {
-                pl->o.z -= step;
-                pl->newpos.z -= step;
-            }
-        }
-    }
-}
-
 bool bounce(physent *d, float secs, float elasticity, float waterfric, float grav)
 {
     // make sure bouncers don't start inside geometry
@@ -1721,15 +1680,15 @@ bool droptofloor(vec &o, float radius, float height)
 {
     static struct dropent : physent
     {
-        dropent() 
-        { 
-            type = ENT_CAMERA; 
-            //collidetype = COLLIDE_AABB; 
+        dropent()
+        {
+            type = ENT_CAMERA;
+            //collidetype = COLLIDE_AABB;
             vel = vec(0, 0, -1);
         }
     } d;
     d.o = o;
-    if(!insideworld(d.o)) 
+    if(!insideworld(d.o))
     {
         if(d.o.z < worldsize) return false;
         d.o.z = worldsize - 1e-3f;
@@ -1862,7 +1821,7 @@ void modifyvelocity(physent *pl, bool local, bool water, bool floating, int curt
         {
             if(pl==player) d.mul(floatspeed/100.0f);
         }
-        else if(pl->physstate >= PHYS_SLOPE && pl->crouching) d.mul(0.35f);
+        else if(!water && game::allowmove(pl)) d.mul((pl->move && !pl->strafe ? 1.3f : 1.0f) * (pl->physstate < PHYS_SLOPE ? 1.3f : 1.0f));
     }
     float fric = water && !floating ? 20.0f : (pl->physstate >= PHYS_SLOPE || floating ? 6.0f : 30.0f);
     pl->vel.lerp(d, pl->vel, pow(1 - 1/fric, curtime/20.0f));
@@ -2083,7 +2042,6 @@ dir(left,     strafe,  1, k_left,  k_right);
 dir(right,    strafe, -1, k_right, k_left);
 
 ICOMMAND(jump,   "D", (int *down), { if(!*down || game::canjump()) player->jumping = *down!=0; });
-ICOMMAND(crouch, "D", (int *down), { if(!*down) player->crouching = abs(player->crouching); else if(game::cancrouch()) player->crouching = -1; });
 ICOMMAND(attack, "D", (int *down), { game::doattack(*down!=0); });
 
 bool entinmap(dynent *d, bool avoidplayers)        // brute force but effective way to find a free spawn spot in the map
@@ -2120,4 +2078,3 @@ bool entinmap(dynent *d, bool avoidplayers)        // brute force but effective 
     conoutf(CON_WARN, "can't find entity spawn spot! (%.1f, %.1f, %.1f)", d->o.x, d->o.y, d->o.z);
     return false;
 }
-

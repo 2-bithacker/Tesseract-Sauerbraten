@@ -720,7 +720,7 @@ void rotatebb(vec &center, vec &radius, int yaw, int pitch, int roll)
     matrix3x3 orient;
     orient.identity();
     if(yaw) orient.rotate_around_z(sincosmod360(yaw));
-    if(pitch) orient.rotate_around_x(sincosmod360(pitch));
+    //if(pitch) orient.mul(quat(vec(0, 1, 0), pitch*RAD), quat(orient));
     if(roll) orient.rotate_around_y(sincosmod360(-roll));
     center = orient.transform(center);
     radius = orient.abstransform(radius);
@@ -857,7 +857,7 @@ bool mmcollide(physent *d, const vec &dir, float cutoff, octaentities &oc) // co
         vec center, radius;
         m->collisionbox(center, radius);
         if(e.attr5 > 0) { float scale = e.attr5/100.f; center.mul(scale); radius.mul(scale); }
-        int yaw = e.attr2, pitch = e.attr3, roll = e.attr4;
+        float yaw = e.attr2, pitch = e.attr3, roll = e.attr4;
         switch(d->collidetype)
         {
             case COLLIDE_ELLIPSE:

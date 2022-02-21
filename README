@@ -27,7 +27,7 @@ Install:
 
 Currently, to use Tesseract you must have a copy of the "packages" directory
 from a recent checkout of Sauerbraten SVN. To get a copy of Sauerbraten SVN,
-please see the following page: http://sourceforge.net/p/sauerbraten/code
+please see the following page: https://sourceforge.net/projects/sauerbraten/files/latest/download
 
 If you are on Linux or other unixoid, just make a symlink to the Sauerbraten
 packages directory inside your Tesseract directory. You can also edit the

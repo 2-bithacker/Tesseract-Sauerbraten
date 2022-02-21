@@ -1,4 +1,4 @@
-# Tesseract: Suarbraten
+# Tesseract: Sauerbraten
 
 Most of all this is NOT my work.  I made it off of a couple of forks.
 The original tesseract: https://github.com/lsalzman/tesseract

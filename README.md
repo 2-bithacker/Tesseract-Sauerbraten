@@ -11,4 +11,6 @@ The only difference between this one and that one is that this one is updated to
 
 This also includes an installer script for debian-baased linux distros.  If you do not have a debian-based linux distro, you will have to do it manually, but if you have a debian-based linux distro, you can run `cd ~/Tesseract-Sauerbraten`, then `./install` to install it.
 
-You can also undo the installation if it has failed.  To do that, run `cd ~/Tesseract-Sauerbraten` then `./uninstall` and that will uninstall it.
+The script also makes a desktop launcher for easy launching.
+
+You can undo the installation if it has failed.  To do that, run `cd ~/Tesseract-Sauerbraten` then `./uninstall` and that will uninstall it.

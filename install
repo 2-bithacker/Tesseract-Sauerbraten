@@ -7,7 +7,7 @@ rm ~/Desktop/tesseract.init &>/dev/null
 rm ~/sauerbraten &>/dev/null
 sudo apt update || warning
 sudo apt install --yes zlib1g-dev libgeoip-dev build-essential libsdl2-dev libsdl2-mixer-dev libsdl2-image-dev || error 'Install of sdl2 and opengl libraries failed!'
-make install -C src || error 'build failed!'
+make install -C /src || error 'build failed!'
 cp launcher.init tesseract.init
 mv tesseract.init ~/Desktop
 chmod +x ~/Desktop/tesseract.init

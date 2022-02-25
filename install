@@ -11,6 +11,7 @@ make install -C ~/Tesseract-Sauerbraten/src || error 'build failed!'
 cp launcher.init tesseract.init
 mv tesseract.init ~/Desktop
 chmod +x ~/Desktop/tesseract.init
+chmod +x ~/uninstall
 chmod +x ~/Tesseract-Sauerbraten/bin_unix/native_server
 chmod +x ~/Tesseract-Sauerbraten/bin_unix/native_client
 # Install some packages that are necessary to run this app - no need for "error", as the install_packages function already handles errors.

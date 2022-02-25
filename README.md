@@ -8,7 +8,7 @@ The fork I made this off of: https://github.com/2-bithacker/tesseract-1
 
 The only difference between this one and that one is that this one is updated to accomodate the latest packages.
 
-I have made this for linux, paricularly debian-based linux distros, but If you have windows or mac, you will have to build yourself some binaries.  I do not know how to do it.  If I did, I would include binaries for them too.
+I have made this for linux, paricularly debian-based linux distros, but If you have windows or mac, you will have to build yourself some binaries.  I do not know how to do it.  If I did, I would include binaries for them too.  You can probably look it up and find out how.
 
 You might not have to build binaries.  It comes with some pre-compiled, but if you wsnt to, this includes a bash installer script for debian-baased linux distros.  If you do not have a debian-based linux distro, you will have to do it manually, but if you have a debian-based linux distro, you can run `cd ~/Tesseract-Sauerbraten && chmod +x install && ./install` to install it.
 

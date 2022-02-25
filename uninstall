@@ -1,5 +1,4 @@
 #!/bin/bash
 
-rm -rf ~/tesseract-1 || warning
-rm ~/Desktop/tesseract.init || warning
-rm tesseract.init || warning
+rm ~/Desktop/tesseract.init
+rm tesseract.init

@@ -12,7 +12,7 @@ You might not have to build binaries at all as is comes with some pre-compiled, 
 
 The script also makes a desktop launcher for easy launching.
 
-You can undo the installation if it has failed.  To do that, run `cd ~/Tesseract-Sauerbraten` then `./uninstall` That will uninstall it.
+You can undo the installation if it has failed.  To do that, run `cd ~/Tesseract-Sauerbraten && ./uninstall` That will uninstall it.
 
 To install on non-debian based linux distros, or if the script didn't work, you can install manually.  First, you have to make sure the opengl and sdl2 libraries are installed.  The names of the debian packages are `zlib1g-dev`, `libgeoip-dev`, `build-essential`, `libsdl2-dev`, `libsdl2-mixer-dev`, and `libsdl2-image-dev`  (The installer script handles this if you can use it.)  Make sure to clone this repository ro your home folder, or you will have to modify the lauch script and launcher to get it to work.  In all this I am assuming you are working in your home folder.
 

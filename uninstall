@@ -1,4 +1,4 @@
 #!/bin/bash
 
 rm ~/Desktop/tesseract.init
-rm tesseract.init
+rm ~/Tesseract-Sauerbraten/tesseract.init

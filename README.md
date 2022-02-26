@@ -8,6 +8,10 @@ The fork I made this off of: https://github.com/2-bithacker/tesseract
 
 The only difference between this one and that one is that this one is updated to accomodate the latest packages.
 
+To download, run `git clone https://github.com/2-bithacker/Tesseract-Sauerbraten.git`
+
+That will download it.
+
 I have made this for linux, paricularly debian-based linux distros, but If you have windows or mac, you will have to build yourself some binaries.  I do not know how to do it.  If I did, I would include binaries for them too.  You can probably look it up and find out how.
 
 You might not have to build binaries, as it comes with some pre-compiled. 

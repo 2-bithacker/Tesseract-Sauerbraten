@@ -9,6 +9,7 @@ sudo apt install --yes zlib1g-dev libgeoip-dev build-essential libsdl2-dev libsd
 make install -C src || error 'build failed!'
 cp launcher.init tesseract.init
 mv tesseract.init ~/Desktop
-chmod +x ~/Desktop/tesseract.init
+chmod +x ~/Desktop/tesseract.init || error 'chmod of the desktop launcher failed!'
+chmod +x uninstall
 chmod +x bin_unix/native_server || error 'chmod of bin_unix/native_server failed!'
 chmod +x bin_unix/native_client || error 'chmod of bin_unix/native_client failed!'

@@ -1,4 +1,4 @@
 #!/bin/bash
 
-cd ~/Tesseract-Sauerbraten
+cd ~/Tesseract-Sauerbraten || error 'folder ~/Tesseract-Sauerbraten not found.  Are you working out of a directory other that your home directory?'
 ./tesseract_unix

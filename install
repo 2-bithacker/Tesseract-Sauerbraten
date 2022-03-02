@@ -4,15 +4,11 @@
 #Be sure to use the "error" function - it will display a message if a command fails to run. Example below:
 rm tesseract.init &>/dev/null
 rm ~/Desktop/tesseract.init &>/dev/null
-rm ~/sauerbraten &>/dev/null
 sudo apt update || warning
 sudo apt install --yes zlib1g-dev libgeoip-dev build-essential libsdl2-dev libsdl2-mixer-dev libsdl2-image-dev || error 'Install of sdl2 and opengl libraries failed!'
-make install -C ~/Tesseract-Sauerbraten/src || error 'build failed!'
+make install -C src || error 'build failed!'
 cp launcher.init tesseract.init
 mv tesseract.init ~/Desktop
 chmod +x ~/Desktop/tesseract.init
-chmod +x ~/Tesseract-Sauerbraten/uninstall
-chmod +x ~/Tesseract-Sauerbraten/bin_unix/native_server
-chmod +x ~/Tesseract-Sauerbraten/bin_unix/native_client
-# Install some packages that are necessary to run this app - no need for "error", as the install_packages function already handles errors.
-#exit 0
+chmod +x bin_unix/native_server || error 'chmod of bin_unix/native_server failed!'
+chmod +x bin_unix/native_client || error 'chmod of bin_unix/native_client failed!'

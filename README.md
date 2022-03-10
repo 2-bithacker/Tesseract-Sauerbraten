@@ -32,4 +32,4 @@ How to launch without install script:  Navigate into the main directory, `cd Tes
 
 That should get you going!  If you have any problems, feel free to start an issue, and I will do my best to set you up.
 
-This version of tesseract sauerbraten (the more user-freindly version, not the source code updating) was brought to you by the RD sauerclan.  Check us out!  https://freddaws.wixsite.com/realdeal
+This version of tesseract sauerbraten (the more user-freindly version, not the source code updating) was brought to you by the RD sauerclan.  Check us out!  https://freddaws.wixsite.com/realdeal :)

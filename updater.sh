@@ -1,4 +1,4 @@
-#!bin/bash
+#!/bin/bash
 
 #bash updater for Tesseract: Sauerbraten
 #this requires a github account to use

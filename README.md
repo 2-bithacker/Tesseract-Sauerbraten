@@ -1,6 +1,7 @@
 # Tesseract: Sauerbraten
 
-NOTE: this poroject is more or less dead, but someone else is continuing the effort to port Sauerbraten to Tesseract engine: https://github.com/Big-Onche/Tesseract-Sauerbraten
+> [!NOTE]
+> This project is more or less dead, but someone else is continuing the effort to port Sauerbraten to Tesseract engine: https://github.com/Big-Onche/Tesseract-Sauerbraten
 
 Most of all this is NOT my work.  I made it off of a couple of forks.
 

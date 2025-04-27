@@ -1,22 +1,20 @@
 # Tesseract: Sauerbraten
 
-NOTE: this poroject is more or less dead, but someone else is continuing the effort to port Sauerbraten to Tesseract engine: https://github.com/Big-Onche/Tesseract-Sauerbraten
+NOTE: this poroject is more or less dead, and has some very bad bugs, but someone else is continuing the effort to port Sauerbraten to the Tesseract engine here: https://github.com/Big-Onche/Tesseract-Sauerbraten
 
-Most of all this is NOT my work.  I made it off of a couple of forks.
+Most of all this is NOT my work; I made it from a couple of forks:
+    The original tesseract: https://github.com/lsalzman/tesseract
+    The fork of a fork I made this off of: https://github.com/2-bithacker/tesseract
 
-The original tesseract: https://github.com/lsalzman/tesseract
-
-The fork of a fork I made this off of: https://github.com/2-bithacker/tesseract
-
-The only difference between this one and that one is that this one is updated to accomodate the latest packages.
+The only difference between this one and the original fork is that this one is updated to accomodate the latest packages.
 
 To download, run `git clone https://github.com/2-bithacker/Tesseract-Sauerbraten.git`
 
-That will download it.
+That will download the files.
 
-I have made this for linux, paricularly debian-based linux distros, but If you have windows or mac, you will have to build yourself some binaries.  I do not know how to do it.  If I did, I would include binaries for them too.  You can probably look it up and find out how.
+I have made this for linux, paricularly debian-based linux distros, but If you have windows or mac, you will have to build yourself some binaries. I do not know how to do it; If I did, I would include binaries for them too. You can probably look it up and find out how, somewehere.
 
-You might not have to build binaries, as it comes with some pre-compiled. 
+You might not have to build binaries, as it comes with some for linux pre-compiled. 
 
 This includes a bash installer script for debian-baased linux distros that can build your code and add a dektop launcher.  If you do not have a debian-based linux distro, you will have to do it manually, but if you have a debian-based linux distro, you can run `cd ~/Tesseract-Sauerbraten && chmod +x install && ./install` to install it.
 
@@ -34,4 +32,4 @@ How to launch without install script:  Navigate into the main directory, `cd Tes
 
 That should get you going!  If you have any problems, feel free to start an issue, and I will do my best to set you up.
 
-This version of tesseract sauerbraten (the more user-freindly version, not the source code updating (Credits fo to Calinou on that one)) was brought to you by the RD sauerclan.  Check us out!  https://freddaws.wixsite.com/realdeal :)
+This version of tesseract sauerbraten (the more user-freindly version, not the source code updating (Credits fo to Calinou on that one)) was brought to you by the RD sauerclan.  Check us out!  https://freddaws.wixsite.com/realdeal :) This clan mad dead btw lol
